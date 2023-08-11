@@ -1,5 +1,5 @@
 # Mateo Avalos & Santiago Toro
-# LEDs and Serial Communication - Hardware Arquitecture 2023-2
+# LEDs and Serial Communication - Hardware Architecture 2023-2
 ## Project Overview
 This project demonstrates a way to control the blinking rates of three LEDs (red, green, and blue) using the mbed microcontroller **FRDM-K64F** and the **FRDM-KL25Z**. The provided code uses interrupt-driven timers to toggle the LEDs' states and calculates the time each LED has been on based on the number of interrupts. The code is written in C++ and utilizes the mbed platform's functionalities.
 

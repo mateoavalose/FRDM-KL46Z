@@ -1,72 +1,209 @@
-![](./resources/official_armmbed_example_badge.png)
-# Blinky Mbed OS example
+# LEDs and Serial Communication - Hardware Arquitecture 2023-2
+## Project Overview
+This project demonstrates a way to control the blinking rates of three LEDs (red, green, and blue) using the mbed microcontroller **FRDM-K64F** and the **FRDM-KL25Z**. The provided code uses interrupt-driven timers to toggle the LEDs' states and calculates the time each LED has been on based on the number of interrupts. The code is written in C++ and utilizes the mbed platform's functionalities.
 
-The example project is part of the [Arm Mbed OS Official Examples](https://os.mbed.com/code/) and is the [getting started example for Mbed OS](https://os.mbed.com/docs/mbed-os/latest/quick-start/index.html). It contains an application that repeatedly blinks an LED on supported [Mbed boards](https://os.mbed.com/platforms/).
+## Code Explanation
+Here's a breakdown of the code's sections:
 
-You can build the project with all supported [Mbed OS build tools](https://os.mbed.com/docs/mbed-os/latest/tools/index.html). However, this example project specifically refers to the command-line interface tool [Arm Mbed CLI](https://github.com/ARMmbed/mbed-cli#installing-mbed-cli).
-(Note: To see a rendered example you can import into the Arm Online Compiler, please see our [import quick start](https://os.mbed.com/docs/mbed-os/latest/quick-start/online-with-the-online-compiler.html#importing-the-code).)
+### 1. Serial Communication Initialization
+The code establishes serial communication with the computer using an `UnbufferedSerial` object. This enables interaction with the user to input the blinking rates for each LED.
+```cpp
+#include "mbed.h"
+#include <iostream>
 
-## Mbed OS build tools
+// Obect to stablish serial communication with the computer
+UnbufferedSerial serial(USBTX, USBRX, 9600);
+using namespace std;
+```
 
-### Mbed CLI 2
-Starting with version 6.5, Mbed OS uses Mbed CLI 2. It uses Ninja as a build system, and CMake to generate the build environment and manage the build process in a compiler-independent manner. If you are working with Mbed OS version prior to 6.5 then check the section [Mbed CLI 1](#mbed-cli-1).
-1. [Install Mbed CLI 2](https://os.mbed.com/docs/mbed-os/latest/build-tools/install-or-upgrade.html).
-1. From the command-line, import the example: `mbed-tools import mbed-os-example-blinky`
-1. Change the current directory to where the project was imported.
+### 2. LED Objects and Counters
+Three `DigitalOut` objects are created to control the red, green, and blue LEDs. Additionally, counters are initialized to keep track of the number of interrupts and expected values for each LED.
+```cpp
+DigitalOut ledR(LED1, 1);
+DigitalOut ledG(LED2, 1);
+DigitalOut ledB(LED3, 1);
 
-### Mbed CLI 1
-1. [Install Mbed CLI 1](https://os.mbed.com/docs/mbed-os/latest/quick-start/offline-with-mbed-cli.html).
-1. From the command-line, import the example: `mbed import mbed-os-example-blinky`
-1. Change the current directory to where the project was imported.
+int counterR = 0;
+int expected_valueR = 0;
 
-## Application functionality
+int counterG = 0;
+int expected_valueG = 0;
 
-The `main()` function is the single thread in the application. It toggles the state of a digital output connected to an LED on the board.
+int counterB = 0;
+int expected_valueB = 0;
+```
 
-**Note**: This example requires a target with RTOS support, i.e. one with `rtos` declared in `supported_application_profiles` in `targets/targets.json` in [mbed-os](https://github.com/ARMmbed/mbed-os). For non-RTOS targets (usually with small memory sizes), please use [mbed-os-example-blinky-baremetal](https://github.com/ARMmbed/mbed-os-example-blinky-baremetal) instead.
+### 3. Interrupt Service Routines (ISRs)
+The code defines three ISRs, one for each LED. These ISRs toggle the states of the LEDs and increment the corresponding counters. The LED toggling is accomplished by inverting the current LED state.
+```cpp
+// Interruption functions for every led
+void timerR_interrupt() {
+   ledR = !ledR; // Inverts the state of the red LED
+   counterR++; 
+}
+void timerG_interrupt() {
+   ledG = !ledG; // Inverts the state of the green LED
+   counterG++; 
+}
+void timerB_interrupt(){
+   ledB = !ledB; // Inverts the state of the blue LED
+   counterB++;
+}
+```
+### 4. Main Function
 
-## Building and running
+The main function is where the program starts its execution. Inside the main loop, the code interacts with the user to input the desired blinking rates for each LED. It then creates `Ticker` objects and attaches the previously defined ISRs to these tickers with the specified blinking rates.
+The main loop continuously monitors each of the counter values and calculates when was the last time it changed state based on the user-defined blinking rates. This information is printed to the console.
+```cpp
+int main()
+{
+   cout << "Enter a blinking time for the red LED: (in milliseconds): ";
+   int BlinkingRateRed;
+   cin >> BlinkingRateRed;
+   BlinkingRateRed = BlinkingRateRed*1000;
 
-1. Connect a USB cable between the USB port on the board and the host computer.
-1. Run the following command to build the example project and program the microcontroller flash memory:
+   cout << "Enter a blinking time for the green LED (in milliseconds): ";
+   int BlinkingRateGreen;
+   cin >> BlinkingRateGreen;
+   BlinkingRateGreen = BlinkingRateGreen*1000;
 
-    * Mbed CLI 2
+   cout << "Enter a blinking time for the blue LED (in milliseconds): ";
+   int BlinkingRateBlue;
+   cin >> BlinkingRateBlue;
+   BlinkingRateBlue = BlinkingRateBlue*1000;
 
-    ```bash
-    $ mbed-tools compile -m <TARGET> -t <TOOLCHAIN> --flash
-    ```
+   Ticker tickerR;
+   Ticker tickerG;
+   Ticker tickerB;
 
-    * Mbed CLI 1
+   tickerR.attach_us(timerR_interrupt, BlinkingRateRed); // Red Led Interruption
+   tickerG.attach_us(timerG_interrupt, BlinkingRateGreen); // Green Led Interruption
+   tickerB.attach_us(timerB_interrupt, BlinkingRateBlue); // Blue Led Interruption
 
-    ```bash
-    $ mbed compile -m <TARGET> -t <TOOLCHAIN> --flash
-    ```
+   while (true)
+   {
+      if (expected_valueR != counterR) {
+         cout << "RLed = " << BlinkingRateRed/1000*counterR << endl;
+         expected_valueR = counterR;
+      }
 
-Your PC may take a few minutes to compile your code.
+      if (expected_valueG != counterG) {
+         cout << "GLed = " << BlinkingRateGreen/1000*counterG << endl;
+         expected_valueG = counterG;
+         }
 
-The binary is located at:
-* **Mbed CLI 2** - `./cmake_build/mbed-os-example-blinky.bin`</br>
-* **Mbed CLI 1** - `./BUILD/<TARGET>/<TOOLCHAIN>/mbed-os-example-blinky.bin`
+        if (expected_valueB != counterB) {
+            cout << "BLed = " << BlinkingRateBlue/1000*counterB << endl;
+            expected_valueB = counterB;
+        }
 
-Alternatively, you can manually copy the binary to the board, which you mount on the host computer over USB.
+        ThisThread::sleep_for(1ms);
+    }
+}
+```
 
-## Expected output
-The LED on your target turns on and off every 500 milliseconds.
+# LEDs y Comunicación Serial - Arquitectura de Hardware 2023-2
+## Generalidades del Proyecto
+Este proyecto demuestra una forma de controlar los tiempos de parpadeo de los tres LEDs (rojo, verde y azul) utilizando el microcontrolador mbed **FRDM-K64F** y el **FRDM-KL25Z**. El código utiliza unos temporizadores controlados por interrupciones para cambiar el estado de los LEDs y calcular en qué momento del temporizador se realizó la interrupción. El código está escrito en C++ y utiliza las funcionalidades de la plataforma de mbed.
 
+## Explicación del Código
+Aquí hay una explicación de las secciones del código:
 
-## Troubleshooting
-If you have problems, you can review the [documentation](https://os.mbed.com/docs/latest/tutorials/debugging.html) for suggestions on what could be wrong and how to fix it.
+### 1. Inicialización de Comunicación Serial
+El código establece la comunicación serial con la computadora utilizando un objeto `UnbufferedSerial`. Esto permite la interacción con el usuario para ingresar las tasas de parpadeo para cada LED.
+```cpp
+#include "mbed.h"
+#include <iostream>
 
-## Related Links
+// Objeto para establecer la comunicación serial con la computadora
+UnbufferedSerial serial(USBTX, USBRX, 9600);
+using namespace std;
+```
 
-* [Mbed OS Stats API](https://os.mbed.com/docs/latest/apis/mbed-statistics.html).
-* [Mbed OS Configuration](https://os.mbed.com/docs/latest/reference/configuration.html).
-* [Mbed OS Serial Communication](https://os.mbed.com/docs/latest/tutorials/serial-communication.html).
-* [Mbed OS bare metal](https://os.mbed.com/docs/mbed-os/latest/reference/mbed-os-bare-metal.html).
-* [Mbed boards](https://os.mbed.com/platforms/).
+### 2. Objetos de LED y Contadores
+Se crean tres objetos `DigitalOut` para controlar los LEDs rojo, verde y azul. Además, se inicializan contadores para realizar un seguimiento del número de interrupciones y los valores esperados para cada LED.
+```cpp
+DigitalOut ledR(LED1, 1);
+DigitalOut ledG(LED2, 1);
+DigitalOut ledB(LED3, 1);
 
-### License and contributions
+int counterR = 0;
+int expected_valueR = 0;
 
-The software is provided under Apache-2.0 license. Contributions to this project are accepted under the same license. Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for more info.
+int counterG = 0;
+int expected_valueG = 0;
 
-This project contains code from other projects. The original license text is included in those source files. They must comply with our license guide.
+int counterB = 0;
+int expected_valueB = 0;
+```
+
+### 3. Rutinas de Servicio de Interrupción (ISRs)
+El código define tres ISRs, una para cada LED. Estas ISRs cambian los estados de los LEDs e incrementan los contadores correspondientes. El cambio de estado de los LEDs se logra invirtiendo el estado actual del LED.
+```cpp
+// Funciones de interrupción para cada LED
+void timerR_interrupt() {
+    ledR = !ledR; // Invierte el estado del LED rojo
+    counterR++; 
+}
+
+void timerG_interrupt() {
+    ledG = !ledG; // Invierte el estado del LED verde
+    counterG++; 
+}
+
+void timerB_interrupt(){
+    ledB = !ledB; // Invierte el estado del LED azul
+    counterB++;
+}
+```
+
+### 4. Función Principal
+La función principal es donde el programa comienza su ejecución. Dentro del ciclo principal, el código interactúa con el usuario para ingresar las tasas de parpadeo deseadas para cada LED. Luego, crea objetos `Ticker` y adjunta las ISRs previamente definidas a estos tickers con las tasas de parpadeo especificadas.
+El ciclo principal monitorea continuamente los valores de los contadores y calcula cuándo fue la última vez que cambió de estado en función de las tasas de parpadeo definidas por el usuario. Esta información se imprime en la consola.
+```cpp
+int main()
+{
+    cout << "Ingrese el tiempo de parpadeo para el LED rojo (en milisegundos): ";
+    int BlinkingRateRed;
+    cin >> BlinkingRateRed;
+    BlinkingRateRed = BlinkingRateRed * 1000;
+
+    cout << "Ingrese el tiempo de parpadeo para el LED verde (en milisegundos): ";
+    int BlinkingRateGreen;
+    cin >> BlinkingRateGreen;
+    BlinkingRateGreen = BlinkingRateGreen * 1000;
+
+    cout << "Ingrese el tiempo de parpadeo para el LED azul (en milisegundos): ";
+    int BlinkingRateBlue;
+    cin >> BlinkingRateBlue;
+    BlinkingRateBlue = BlinkingRateBlue * 1000;
+
+    Ticker tickerR;
+    Ticker tickerG;
+    Ticker tickerB;
+
+    tickerR.attach_us(timerR_interrupt, BlinkingRateRed);
+    tickerG.attach_us(timerG_interrupt, BlinkingRateGreen);
+    tickerB.attach_us(timerB_interrupt, BlinkingRateBlue);
+
+    while (true)
+    {
+        if (expected_valueR != counterR) {
+            cout << "RLed = " << BlinkingRateRed / 1000 * counterR << endl;
+            expected_valueR = counterR;
+        }
+
+        if (expected_valueG != counterG) {
+            cout << "GLed = " << BlinkingRateGreen / 1000 * counterG << endl;
+            expected_valueG = counterG;
+        }
+
+        if (expected_valueB != counterB) {
+            cout << "BLed = " << BlinkingRateBlue / 1000 * counterB << endl;
+            expected_valueB = counterB;
+        }
+
+        ThisThread::sleep_for(1ms);
+    }
+}
+```

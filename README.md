@@ -103,6 +103,8 @@ int main()
 }
 ```
 
+---
+
 # LEDs y Comunicación Serial - Arquitectura de Hardware 2023-2
 ## Generalidades del Proyecto
 Este proyecto demuestra una forma de controlar los tiempos de parpadeo de los tres LEDs (rojo, verde y azul) utilizando el microcontrolador mbed **FRDM-K64F** y el **FRDM-KL25Z**. El código utiliza unos temporizadores controlados por interrupciones para cambiar el estado de los LEDs y calcular en qué momento del temporizador se realizó la interrupción. El código está escrito en C++ y utiliza las funcionalidades de la plataforma de mbed.

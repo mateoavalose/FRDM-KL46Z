@@ -7,6 +7,3 @@ compile_commands.json
 .clangd
 .cache
 mbed-os
-HTU21D
-SLCD-
-HC-SR04

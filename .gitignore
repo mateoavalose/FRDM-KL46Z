@@ -6,6 +6,4 @@ compile_commands.json
 .clangd
 .cache
 mbed-os
-HC-SR04
-HTU21D
 *.csv

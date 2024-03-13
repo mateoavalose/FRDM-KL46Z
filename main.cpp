@@ -6,81 +6,50 @@
 #include "mbed.h"
 #include <iostream>
 
-// Obect to stablish serial communication with the computer
-UnbufferedSerial serial(USBTX, USBRX, 9600);
-using namespace std;
-    
-    DigitalOut ledR(LED1, 1);
-    DigitalOut ledG(LED2, 1);
-    DigitalOut ledB(LED3, 1);
+// Blinking rate in milliseconds
+#define BLINKING_RATE 200ms
 
-    int counterR = 0;
-    int expected_valueR = 0;
+UnbufferedSerial pc(USBTX, USBRX, 9600);
 
-    int counterG = 0;
-    int expected_valueG = 0;
+PwmOut ledR(LED1);
+PwmOut ledG(LED2);
+PwmOut ledB(LED3);
 
-    int counterB = 0;
-    int expected_valueB = 0;
+int main() {
 
-    // Interruption functions for every led
-    void timerR_interrupt() {
-        ledR = !ledR; // Inverts the state of the red LED
-        counterR++; 
-    }
+  while (true) {
+    // Define the LED periods
+    ledR.period(0.1);
+    ledG.period(0.1);
+    ledB.period(0.1);
 
-    void timerG_interrupt() {
-        ledG = !ledG; // Inverts the state of the green LED
-        counterG++; 
-    }
+    // Ask for the RGB value
+    cout << "Enter a Hexadecimal value: " << endl;
+    string hexCode;
+    cin >> hexCode;
 
-    void timerB_interrupt(){
-        ledB = !ledB; // Inverts the state of the blue LED
-        counterB++;
-    }
+    // Remove the '#' character from the hexadecimal code
+    if(hexCode[0] == '#')
+        hexCode.erase(0, 1);
 
-int main()
-{
-    cout << "Enter a blinking time for the red LED: (in milliseconds): ";
-    int BlinkingRateRed;
-    cin >> BlinkingRateRed;
-    BlinkingRateRed = BlinkingRateRed*1000;
+    // Convert the hexadecimal code to integer
+    int hexValue = std::stoi(hexCode, nullptr, 16);
 
-    cout << "Enter a blinking time for the green LED (in milliseconds): ";
-    int BlinkingRateGreen;
-    cin >> BlinkingRateGreen;
-    BlinkingRateGreen = BlinkingRateGreen*1000;
+    // Extract the red, green, and blue values using bitwise operations and bit shifting
+    int red = (hexValue >> 16) & 0xFF;
+    int green = (hexValue >> 8) & 0xFF;
+    int blue = hexValue & 0xFF;
 
-    cout << "Enter a blinking time for the blue LED (in milliseconds): ";
-    int BlinkingRateBlue;
-    cin >> BlinkingRateBlue;
-    BlinkingRateBlue = BlinkingRateBlue*1000;
+    // Turn the 0 - 255 values into a 0 - 1 percentage
+    float FFRed = 1 - red/255.0;
+    float FFGreen = 1 - green/255.0;
+    float FFBlue = 1 - blue/255.0;
 
-    Ticker tickerR;
-    Ticker tickerG;
-    Ticker tickerB;
-
-    tickerR.attach_us(timerR_interrupt, BlinkingRateRed); // Interrupción para el LED rojo
-    tickerG.attach_us(timerG_interrupt, BlinkingRateGreen); // Interrupción para el LED verde
-    tickerB.attach_us(timerB_interrupt, BlinkingRateBlue); // Interrupción para el LED azul
-
-    while (true)
-    {
-        if (expected_valueR != counterR) {
-            cout << "RLed = " << BlinkingRateRed/1000*counterR << endl;
-            expected_valueR = counterR;
-        }
-
-        if (expected_valueG != counterG) {
-            cout << "GLed = " << BlinkingRateGreen/1000*counterG << endl;
-            expected_valueG = counterG;
-        }
-
-        if (expected_valueB != counterB) {
-            cout << "BLed = " << BlinkingRateBlue/1000*counterB << endl;
-            expected_valueB = counterB;
-        }
-
-        ThisThread::sleep_for(1ms);
-    }
+    // Write a specific color in the LED
+    cout << "Red: " << red << ", Green: " << green << ", Blue: " << blue << endl;
+    ledR.write(FFRed);
+    ledG.write(FFGreen);
+    ledB.write(FFBlue);
+    cout << "------------------------------" << endl;
+  }
 }

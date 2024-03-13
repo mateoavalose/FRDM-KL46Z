@@ -1,212 +1,147 @@
 # Mateo Avalos & Santiago Toro
-# LEDs and Serial Communication - Hardware Architecture 2023-2
+# PWM and color generation with RBG LED - Hardware Architecture 2023-2
 ## Project Overview
-This project demonstrates a way to control the blinking rates of three LEDs (red, green, and blue) using the mbed microcontroller **FRDM-K64F** and the **FRDM-KL25Z**. The provided code uses interrupt-driven timers to toggle the LEDs' states and calculates the time each LED has been on based on the number of interrupts. The code is written in C++ and utilizes the mbed platform's functionalities.
+This project uses the `Pulse-Width Modulation (PWM)` function to generate a color on the RGB LED of the mbed microcontroller **FRDM-K64F** and **FRDM-KL25Z**. The code receives a hexadecimal code of the desired color, obtains the numerical value of each color and writes them to each color of the LED. The code is written in C++ and uses the functionalities of the mbed platform.
 
 ## Code Explanation
 Here's a breakdown of the code's sections:
 
 ### 1. Serial Communication Initialization
-The code establishes serial communication with the computer using an `UnbufferedSerial` object. This enables interaction with the user to input the blinking rates for each LED.
+The code establishes serial communication with the computer using an `UnbufferedSerial` object. This enables interaction with the user to input the hexadecimal code.
 ```cpp
 #include "mbed.h"
 #include <iostream>
 
-// Obect to stablish serial communication with the computer
-UnbufferedSerial serial(USBTX, USBRX, 9600);
-using namespace std;
+UnbufferedSerial pc(USBTX, USBRX, 9600);
 ```
 
-### 2. LED Objects and Counters
-Three `DigitalOut` objects are created to control the red, green, and blue LEDs. Additionally, counters are initialized to keep track of the number of interrupts and expected values for each LED.
+### 2. PwmOut Objects
+Three `PwmOut` objects are created to control the time period that the LEDs are going to be on, and so, be able to control the apparent intensity for each component of the RGB LED.
 ```cpp
-DigitalOut ledR(LED1, 1);
-DigitalOut ledG(LED2, 1);
-DigitalOut ledB(LED3, 1);
-
-int counterR = 0;
-int expected_valueR = 0;
-
-int counterG = 0;
-int expected_valueG = 0;
-
-int counterB = 0;
-int expected_valueB = 0;
+PwmOut ledR(LED1);
+PwmOut ledG(LED2);
+PwmOut ledB(LED3);
 ```
 
-### 3. Interrupt Service Routines (ISRs)
-The code defines three ISRs, one for each LED. These ISRs toggle the states of the LEDs and increment the corresponding counters. The LED toggling is accomplished by inverting the current LED state.
+### 3. Main Function
+The first thing the main function does is set the pulse-width modulation (PWM) period for each color of the RGB LED. The main function consists of an infinite loop that asks the user to enter a hexadecimal value that represents a color, and then checks if the user entered the corresponding **'#'** code. If so, it removes it.
+
+Then it uses the `std::stoi` function to convert the hexadecimal code to an integer value: the code string is passed and it is specified that it is in base 16. With this value obtained and using `bitwise` with `bitshifting`, the value of each color (red, green and blue) is extracted in its form from 0 to 255. What is done in the `hexValue >> 16` instruction is to shift the bits of **hexValue** 16 positions to the right, discarding the green and blue values in **hexValue**. After, the `& 0xFF` operation performs a **bitwise** and an operation with **_0xFF_**, which results in only keeping the last 8 most significant bits, the red component. Similarly, the values for green and blue are extracted, but modifying the number of bits that **hexValue** will be shifted and keeping the 8 most significant bits.
+
+To convert the values of each color to a percentage, they are divided by 255 and that value is subtracted from 1, to have the complement and compensate for the reverse logic of **C++**.
+
+To finish, the values of each color are printed on the screen, and they are written with the `.write()` function to specify the percentage of the period that the LED will be on.
+
 ```cpp
-// Interruption functions for every led
-void timerR_interrupt() {
-   ledR = !ledR; // Inverts the state of the red LED
-   counterR++; 
-}
-void timerG_interrupt() {
-   ledG = !ledG; // Inverts the state of the green LED
-   counterG++; 
-}
-void timerB_interrupt(){
-   ledB = !ledB; // Inverts the state of the blue LED
-   counterB++;
-}
-```
-### 4. Main Function
+int main() {
+  // Define the LED periods
+  ledR.period(0.1);
+  ledG.period(0.1);
+  ledB.period(0.1);
 
-The main function is where the program starts its execution. Inside the main loop, the code interacts with the user to input the desired blinking rates for each LED. It then creates `Ticker` objects and attaches the previously defined ISRs to these tickers with the specified blinking rates.
-The main loop continuously monitors each of the counter values and calculates when was the last time it changed state based on the user-defined blinking rates. This information is printed to the console.
-```cpp
-int main()
-{
-   cout << "Enter a blinking time for the red LED: (in milliseconds): ";
-   int BlinkingRateRed;
-   cin >> BlinkingRateRed;
-   BlinkingRateRed = BlinkingRateRed*1000;
+  while (true) {
+    // Ask for the RGB value
+    cout << "Enter a Hexadecimal value: " << endl;
+    string hexCode;
+    cin >> hexCode;
 
-   cout << "Enter a blinking time for the green LED (in milliseconds): ";
-   int BlinkingRateGreen;
-   cin >> BlinkingRateGreen;
-   BlinkingRateGreen = BlinkingRateGreen*1000;
+    // Remove the '#' character from the hexadecimal code
+    if (hexCode[0] == '#')
+      hexCode.erase(0, 1);
 
-   cout << "Enter a blinking time for the blue LED (in milliseconds): ";
-   int BlinkingRateBlue;
-   cin >> BlinkingRateBlue;
-   BlinkingRateBlue = BlinkingRateBlue*1000;
+    // Convert the hexadecimal code to integer
+    int hexValue = std::stoi(hexCode, nullptr, 16);
 
-   Ticker tickerR;
-   Ticker tickerG;
-   Ticker tickerB;
+    // Extract the red, green, and blue values using bitwise operations and bit shifting
+    int red = (hexValue >> 16) & 0xFF;
+    int green = (hexValue >> 8) & 0xFF;
+    int blue = hexValue & 0xFF;
 
-   tickerR.attach_us(timerR_interrupt, BlinkingRateRed); // Red Led Interruption
-   tickerG.attach_us(timerG_interrupt, BlinkingRateGreen); // Green Led Interruption
-   tickerB.attach_us(timerB_interrupt, BlinkingRateBlue); // Blue Led Interruption
+    // Turn the 0 - 255 values into a 0 - 1 percentage
+    float FFRed = 1 - red / 255.0;
+    float FFGreen = 1 - green / 255.0;
+    float FFBlue = 1 - blue / 255.0;
 
-   while (true)
-   {
-      if (expected_valueR != counterR) {
-         cout << "RLed = " << BlinkingRateRed/1000*counterR << endl;
-         expected_valueR = counterR;
-      }
-
-      if (expected_valueG != counterG) {
-         cout << "GLed = " << BlinkingRateGreen/1000*counterG << endl;
-         expected_valueG = counterG;
-         }
-
-        if (expected_valueB != counterB) {
-            cout << "BLed = " << BlinkingRateBlue/1000*counterB << endl;
-            expected_valueB = counterB;
-        }
-
-        ThisThread::sleep_for(1ms);
-    }
+    // Write a specific color in the LED
+    cout << "Red: " << red << ", Green: " << green << ", Blue: " << blue << endl;
+    ledR.write(FFRed);
+    ledG.write(FFGreen);
+    ledB.write(FFBlue);
+    cout << "------------------------------" << endl;
+  }
 }
 ```
 
 ---
 
-# LEDs y Comunicación Serial - Arquitectura de Hardware 2023-2
+#  PWM y generación de colores con LED RGB - Arquitectura de Hardware 2023-2
 ## Generalidades del Proyecto
-Este proyecto demuestra una forma de controlar los tiempos de parpadeo de los tres LEDs (rojo, verde y azul) utilizando el microcontrolador mbed **FRDM-K64F** y el **FRDM-KL25Z**. El código utiliza unos temporizadores controlados por interrupciones para cambiar el estado de los LEDs y calcular en qué momento del temporizador se realizó la interrupción. El código está escrito en C++ y utiliza las funcionalidades de la plataforma de mbed.
+Este proyecto utiliza la función de `Modulación por Ancho de Pulsos (PWM)` para generar un color en el LED RGB de el microcontrolador mbed **FRDM-K64F** y el **FRDM-KL25Z**. El código recibe un código hexadecimal del color deseado, obtiene el valor numérico de cada color y los escribe a cada color del LED. El código está escrito en C++ y utiliza las funcionalidades de la plataforma de mbed.
 
 ## Explicación del Código
 Aquí hay una explicación de las secciones del código:
 
 ### 1. Inicialización de Comunicación Serial
-El código establece la comunicación serial con la computadora utilizando un objeto `UnbufferedSerial`. Esto permite la interacción con el usuario para ingresar las tasas de parpadeo para cada LED.
+El código establece la comunicación serial con la computadora utilizando un objeto `UnbufferedSerial`. Esto permite la interacción con el usuario para ingresar el código hexadecimal.
 ```cpp
 #include "mbed.h"
 #include <iostream>
 
-// Objeto para establecer la comunicación serial con la computadora
-UnbufferedSerial serial(USBTX, USBRX, 9600);
-using namespace std;
+UnbufferedSerial pc(USBTX, USBRX, 9600);
 ```
 
-### 2. Objetos de LED y Contadores
-Se crean tres objetos `DigitalOut` para controlar los LEDs rojo, verde y azul. Además, se inicializan contadores para realizar un seguimiento del número de interrupciones y los valores esperados para cada LED.
+### 2. Objetos PwmOut
+Se crean tres objetos `PwmOut` para controlar qué tiempo del periodo estarán prendidos los LEDs, y así, controlar la intensidad aparente de cada componente del LED RGB.
 ```cpp
-DigitalOut ledR(LED1, 1);
-DigitalOut ledG(LED2, 1);
-DigitalOut ledB(LED3, 1);
-
-int counterR = 0;
-int expected_valueR = 0;
-
-int counterG = 0;
-int expected_valueG = 0;
-
-int counterB = 0;
-int expected_valueB = 0;
+PwmOut ledR(LED1);
+PwmOut ledG(LED2);
+PwmOut ledB(LED3);
 ```
 
-### 3. Rutinas de Servicio de Interrupción (ISRs)
-El código define tres ISRs, una para cada LED. Estas ISRs cambian los estados de los LEDs e incrementan los contadores correspondientes. El cambio de estado de los LEDs se logra invirtiendo el estado actual del LED.
+### 3. Función Principal
+Lo primero que hace la función principal es ajustar el período de modulación de ancho de pulso (PWM) para cada color del LED RGB. La función principal consta con un ciclo infinito que le solicita al usuario ingresar un valor hexadecimal que represente un color, y luego verifica si el usuario ingresó el **'#'** correspindieinte al código. De ser así, lo elimina. 
+
+Luego utiliza la función `std::stoi` para convertir el código hexadecimal a un valor entero: se entrega el _string_ del código y se especifíca que está en base 16. Con este valor obtenido y utilizando `bitwise` con `bitshifting`, se extrae el valor de cada color (rojo, verde y azul) en su valor de 0 a 255. Lo que se hace en la instrucción de `hexValue >> 16` es correr los bits de **hexValue** 16 posiciones a la derecha, descartando los valores de verde y azul en **hexValue**. Después, la operación `& 0xFF` realiza un **bitwise** y una operación con **_0xFF_**, lo que resulta en solo mantener los últimos 8 bits más significantes, el componente rojo. Así mismo, se extraen los valores para el verde y el azul, pero modificando la candidad de bits que se correrá **hexValue** y manteniendo los 8 bits más significativos.
+
+Para convertir los valores de cada color a un porcentaje, se dividen entre 255 y se resta ese valor de 1, para tener el complemento y compensar la lógica inversa de **C++**.
+
+Para terminar se imprime por consola los valores de cada color, y se escriben con la función `.write()` para especificar el porcentaje de el periodo que el LED estará encendido. 
 ```cpp
-// Funciones de interrupción para cada LED
-void timerR_interrupt() {
-    ledR = !ledR; // Invierte el estado del LED rojo
-    counterR++; 
-}
+int main() {
+  // Define the LED periods
+  ledR.period(0.1);
+  ledG.period(0.1);
+  ledB.period(0.1);
 
-void timerG_interrupt() {
-    ledG = !ledG; // Invierte el estado del LED verde
-    counterG++; 
-}
+  while (true) {
+    // Ask for the RGB value
+    cout << "Enter a Hexadecimal value: " << endl;
+    string hexCode;
+    cin >> hexCode;
 
-void timerB_interrupt(){
-    ledB = !ledB; // Invierte el estado del LED azul
-    counterB++;
-}
-```
+    // Remove the '#' character from the hexadecimal code
+    if (hexCode[0] == '#')
+      hexCode.erase(0, 1);
 
-### 4. Función Principal
-La función principal es donde el programa comienza su ejecución. Dentro del ciclo principal, el código interactúa con el usuario para ingresar las tasas de parpadeo deseadas para cada LED. Luego, crea objetos `Ticker` y adjunta las ISRs previamente definidas a estos tickers con las tasas de parpadeo especificadas.
-El ciclo principal monitorea continuamente los valores de los contadores y calcula cuándo fue la última vez que cambió de estado en función de las tasas de parpadeo definidas por el usuario. Esta información se imprime en la consola.
-```cpp
-int main()
-{
-    cout << "Ingrese el tiempo de parpadeo para el LED rojo (en milisegundos): ";
-    int BlinkingRateRed;
-    cin >> BlinkingRateRed;
-    BlinkingRateRed = BlinkingRateRed * 1000;
+    // Convert the hexadecimal code to integer
+    int hexValue = std::stoi(hexCode, nullptr, 16);
 
-    cout << "Ingrese el tiempo de parpadeo para el LED verde (en milisegundos): ";
-    int BlinkingRateGreen;
-    cin >> BlinkingRateGreen;
-    BlinkingRateGreen = BlinkingRateGreen * 1000;
+    // Extract the red, green, and blue values using bitwise operations and bit shifting
+    int red = (hexValue >> 16) & 0xFF;
+    int green = (hexValue >> 8) & 0xFF;
+    int blue = hexValue & 0xFF;
 
-    cout << "Ingrese el tiempo de parpadeo para el LED azul (en milisegundos): ";
-    int BlinkingRateBlue;
-    cin >> BlinkingRateBlue;
-    BlinkingRateBlue = BlinkingRateBlue * 1000;
+    // Turn the 0 - 255 values into a 0 - 1 percentage
+    float FFRed = 1 - red / 255.0;
+    float FFGreen = 1 - green / 255.0;
+    float FFBlue = 1 - blue / 255.0;
 
-    Ticker tickerR;
-    Ticker tickerG;
-    Ticker tickerB;
-
-    tickerR.attach_us(timerR_interrupt, BlinkingRateRed);
-    tickerG.attach_us(timerG_interrupt, BlinkingRateGreen);
-    tickerB.attach_us(timerB_interrupt, BlinkingRateBlue);
-
-    while (true)
-    {
-        if (expected_valueR != counterR) {
-            cout << "RLed = " << BlinkingRateRed / 1000 * counterR << endl;
-            expected_valueR = counterR;
-        }
-
-        if (expected_valueG != counterG) {
-            cout << "GLed = " << BlinkingRateGreen / 1000 * counterG << endl;
-            expected_valueG = counterG;
-        }
-
-        if (expected_valueB != counterB) {
-            cout << "BLed = " << BlinkingRateBlue / 1000 * counterB << endl;
-            expected_valueB = counterB;
-        }
-
-        ThisThread::sleep_for(1ms);
-    }
+    // Write a specific color in the LED
+    cout << "Red: " << red << ", Green: " << green << ", Blue: " << blue << endl;
+    ledR.write(FFRed);
+    ledG.write(FFGreen);
+    ledB.write(FFBlue);
+    cout << "------------------------------" << endl;
+  }
 }
 ```
